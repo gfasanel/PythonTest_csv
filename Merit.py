@@ -3,7 +3,7 @@ ROOT.gSystem.Load("rootlogon_C.so")
 ROOT.rootlogon()
 
 file=ROOT.TFile('test.root','READ')
-tree=file.Get("TrainTree")
+tree=file.Get("TestTree")
 
 bins=125
 minx=0
