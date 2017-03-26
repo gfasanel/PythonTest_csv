@@ -1,0 +1,103 @@
+import ROOT
+ROOT.gSystem.Load("rootlogon_C.so")
+ROOT.rootlogon()
+
+file=ROOT.TFile('test.root','READ')
+tree=file.Get("TrainTree")
+
+bins=125
+minx=0
+maxx=5000
+pred_=ROOT.TH1F("pred_","pred_",bins,minx,maxx)
+real_=ROOT.TH1F("real_","real_",bins,minx,maxx)
+diff_2=ROOT.TH1F("diff_2","diff_2",100,-0.02,0.02)
+diff_3=ROOT.TH1F("diff_3","diff_3",400,-0.0004,0.0004) #Normalized difference
+corr  =ROOT.TH2F("corr","corr",250,0,5000,250,0,5000)
+
+#Performances
+tree.Draw("BDT>>pred_")
+tree.Draw("actual>>real_")
+c1=ROOT.TCanvas()
+real_.SetLineColor(ROOT.kBlack)
+pred_.SetLineColor(ROOT.kRed)
+pred_.SetFillColor(ROOT.kRed)
+pred_.SetFillStyle(3003)
+pred_.GetXaxis().SetTitle("actual [kW]")
+pred_.GetYaxis().SetTitle("Number of events")
+pred_.DrawNormalized("hist")
+real_.DrawNormalized("samep")
+leg=ROOT.TLegend(0.6,0.6,0.82,0.82)
+leg.AddEntry(pred_,"prediction","l")
+leg.AddEntry(real_,"data (2nd half)","l")
+leg.Draw()
+c1.SetLogy()
+c1.SaveAs("Plots/model_results.png")
+
+for entry in tree:
+    corr.Fill(entry.BDT,entry.actual)
+    diff_2.Fill(entry.actual - entry.BDT) #difference
+    if entry.actual !=0.:
+        diff_3.Fill((entry.actual - entry.BDT)/entry.actual) #normalized difference
+    
+f=ROOT.TF1("f","gaus",-0.004,0.004)
+f.SetParName(0,"Norm")
+f.SetParName(1,"Mean")
+f.SetParName(2,"Sigma")
+f.FixParameter(0,600)
+f.FixParameter(1,4.59037e-06)
+f.FixParameter(2,1.59717e-03)
+
+c2=ROOT.TCanvas()
+diff_2.Fit("f","OFR+")
+#After the fit, access the fit parameters
+#print "chi2= ", f.GetChisquare() #This is NOT normalized (I think)
+#print "dof = ", f.GetNDF()
+#print "mean error is ",f.GetParError(1)
+#print "sigma error is ",f.GetParError(2)
+diff_2.GetXaxis().SetTitle("(data - prediction) [kW]")
+diff_2.GetYaxis().SetTitle("Number of events")
+diff_2.Draw("hist")
+mean_label =ROOT.TLatex(0.15,0.85,"#mu = %.6f"%(f.GetParameter(1)))
+mean_label.SetTextSize(0.04)
+mean_label.SetNDC()
+mean_label.Draw()
+sigma_label =ROOT.TLatex(0.15,0.8,"#sigma = %.6f"%(f.GetParameter(2)))
+sigma_label.SetTextSize(0.04)
+sigma_label.SetNDC()
+sigma_label.Draw()
+m_label =ROOT.TLatex(0.15,0.75,"mean = %.6f"%(diff_2.GetMean()))
+m_label.SetTextSize(0.04)
+m_label.SetNDC()
+m_label.Draw()
+m_label.Draw()
+r_label =ROOT.TLatex(0.15,0.7,"RMS = %.6f"%(diff_2.GetRMS()))
+r_label.SetTextSize(0.04)
+r_label.SetNDC()
+r_label.Draw()
+r_label.Draw()
+f.Draw("same")
+c2.SaveAs("Plots/merit.png")
+
+c3=ROOT.TCanvas()
+diff_3.GetXaxis().SetTitle("(data - prediction)/data")
+diff_3.GetYaxis().SetTitle("Number of events")
+diff_3.Draw("hist")
+M_label =ROOT.TLatex(0.15,0.85,"mean = %.6f"%(diff_3.GetMean()))
+M_label.SetTextSize(0.04)
+M_label.SetNDC()
+M_label.Draw()
+M_label.Draw()
+R_label =ROOT.TLatex(0.15,0.8,"RMS = %.6f"%(diff_3.GetRMS()))
+R_label.SetTextSize(0.04)
+R_label.SetNDC()
+R_label.Draw()
+R_label.Draw()
+c3.SaveAs("Plots/merit_normalized.png")
+
+c4=ROOT.TCanvas()
+corr.GetXaxis().SetTitle("prediction [kW]")
+corr.GetYaxis().SetTitle("data [kW]")
+corr.Draw("colz")
+corr_label =ROOT.TLatex(0.25,0.75,"correlation = %.3f"%(corr.GetCorrelationFactor()))
+corr_label.Draw()
+c4.SaveAs("Plots/final_corr.png")
